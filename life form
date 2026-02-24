@@ -1,0 +1,670 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Biotech Patentability Explorer</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        /* Custom Chart Container Styling to meet specific requirements */
+        .chart-container {
+            position: relative;
+            width: 100%;
+            max-width: 600px;
+            margin-left: auto;
+            margin-right: auto;
+            height: 300px;
+            max-height: 400px;
+        }
+        @media (min-width: 768px) {
+            .chart-container {
+                height: 350px;
+            }
+        }
+        /* Custom scrollbar for better aesthetics */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f5f5f4;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #d6d3d1;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #a8a29e;
+        }
+        .fade-in {
+            animation: fadeIn 0.5s ease-in-out;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+    </style>
+    <!-- Chosen Palette: Warm Neutrals (Stone) with Professional Accents (Teal/Slate) -->
+    <!-- Application Structure Plan:
+         1. Hero Section: Sets the context of the report.
+         2. Interactive Patent Eligibility Wizard: The core interactive request. Allows users to input scenarios and get results based on the case law logic.
+         3. Comparative Landscape (Chart): Visualizes the "strictness" of different regions.
+         4. Case Law Timeline: A chronological exploration of the source text's cases.
+         5. Comparative Matrix: Detailed text comparison.
+         Structure chosen to prioritize the user's practical need (eligibility check) followed by supporting evidence (cases/data).
+    -->
+    <!-- Visualization & Content Choices:
+         - Patent Wizard: Custom JS logic tree. Goal: Guide user decision. Method: Form + Conditional Logic.
+         - Strictness Radar/Bar Chart: Chart.js. Goal: Compare regional policies.
+         - Timeline: Interactive List. Goal: Show evolution.
+         - Matrix: Grid layout. Goal: Quick comparison.
+    -->
+    <!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
+</head>
+<body class="bg-stone-50 text-stone-800 font-sans antialiased selection:bg-teal-100 selection:text-teal-900">
+
+    <!-- Navigation / Header -->
+    <nav class="bg-white border-b border-stone-200 sticky top-0 z-50 shadow-sm">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-16">
+                <div class="flex items-center">
+                    <span class="text-2xl font-bold text-teal-700 tracking-tight">BioPatent<span class="text-stone-500 font-light">Explorer</span></span>
+                </div>
+                <div class="hidden md:flex items-center space-x-8">
+                    <button onclick="scrollToSection('wizard-section')" class="text-stone-600 hover:text-teal-600 px-3 py-2 rounded-md text-sm font-medium transition-colors">Eligibility Checker</button>
+                    <button onclick="scrollToSection('landscape-section')" class="text-stone-600 hover:text-teal-600 px-3 py-2 rounded-md text-sm font-medium transition-colors">Landscape Analysis</button>
+                    <button onclick="scrollToSection('timeline-section')" class="text-stone-600 hover:text-teal-600 px-3 py-2 rounded-md text-sm font-medium transition-colors">Case Timeline</button>
+                </div>
+                <!-- Mobile menu button stub (functional in full app, simplified here) -->
+                <div class="flex items-center md:hidden">
+                    <button onclick="document.getElementById('mobile-menu').classList.toggle('hidden')" class="text-stone-500 hover:text-stone-700 p-2">
+                        ☰
+                    </button>
+                </div>
+            </div>
+        </div>
+        <div id="mobile-menu" class="hidden md:hidden bg-stone-50 border-t border-stone-200 p-4">
+            <div class="flex flex-col space-y-2">
+                <button onclick="scrollToSection('wizard-section')" class="text-left text-stone-600 px-3 py-2">Eligibility Checker</button>
+                <button onclick="scrollToSection('landscape-section')" class="text-left text-stone-600 px-3 py-2">Landscape Analysis</button>
+                <button onclick="scrollToSection('timeline-section')" class="text-left text-stone-600 px-3 py-2">Case Timeline</button>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-16">
+
+        <!-- Intro Section -->
+        <section class="text-center max-w-4xl mx-auto">
+            <h1 class="text-4xl md:text-5xl font-extrabold text-stone-900 mb-6">Navigating the Patentability of Life</h1>
+            <p class="text-lg md:text-xl text-stone-600 leading-relaxed mb-8">
+                From genetically engineered bacteria to isolated human genes, the legal landscape of biotechnology patents has evolved through landmark court decisions. This interactive guide synthesizes key rulings from the <span class="font-semibold text-teal-700">US, Europe, and India</span> to help you understand what constitutes a patentable "invention" versus a "product of nature."
+            </p>
+            <div class="h-1 w-24 bg-teal-500 mx-auto rounded-full"></div>
+        </section>
+
+        <!-- SECTION 1: Interactive Eligibility Wizard (The User Request) -->
+        <section id="wizard-section" class="scroll-mt-20">
+            <div class="bg-white rounded-2xl shadow-xl border border-stone-200 overflow-hidden">
+                <div class="bg-teal-700 p-6 md:p-8 text-white">
+                    <h2 class="text-2xl font-bold mb-2">🧬 Bio-Patent Eligibility Checker</h2>
+                    <p class="text-teal-100">
+                        Analyze your biotech invention against landmark case law. Answer the questions below to receive a preliminary assessment based on the provided legal precedents.
+                    </p>
+                </div>
+
+                <div class="p-6 md:p-8 grid grid-cols-1 lg:grid-cols-2 gap-12">
+                    <!-- Left Column: The Form -->
+                    <div class="space-y-8">
+                        <!-- Step 1: Subject Matter -->
+                        <div>
+                            <label class="block text-sm font-bold text-stone-700 uppercase tracking-wide mb-3">1. Subject Matter</label>
+                            <div class="grid grid-cols-2 gap-3">
+                                <button onclick="setSubject('microorganism')" id="btn-microorganism" class="subject-btn p-3 border-2 border-stone-200 rounded-lg hover:border-teal-500 hover:bg-teal-50 transition-all text-stone-600 font-medium text-left">Microorganism (Bacteria/Virus)</button>
+                                <button onclick="setSubject('plant')" id="btn-plant" class="subject-btn p-3 border-2 border-stone-200 rounded-lg hover:border-teal-500 hover:bg-teal-50 transition-all text-stone-600 font-medium text-left">Plant / Seed</button>
+                                <button onclick="setSubject('animal')" id="btn-animal" class="subject-btn p-3 border-2 border-stone-200 rounded-lg hover:border-teal-500 hover:bg-teal-50 transition-all text-stone-600 font-medium text-left">Animal</button>
+                                <button onclick="setSubject('gene')" id="btn-gene" class="subject-btn p-3 border-2 border-stone-200 rounded-lg hover:border-teal-500 hover:bg-teal-50 transition-all text-stone-600 font-medium text-left">Gene / DNA Sequence</button>
+                            </div>
+                        </div>
+
+                        <!-- Step 2: Method (Dynamic) -->
+                        <div id="step-2-container" class="opacity-50 pointer-events-none transition-opacity duration-300">
+                            <label class="block text-sm font-bold text-stone-700 uppercase tracking-wide mb-3">2. Method / Origin</label>
+                            <div id="method-options" class="grid grid-cols-1 gap-3">
+                                <!-- Options injected by JS -->
+                                <div class="p-3 border border-stone-100 rounded text-stone-400 text-sm italic">Select a subject first...</div>
+                            </div>
+                        </div>
+
+                        <!-- Step 3: Jurisdiction -->
+                        <div id="step-3-container" class="opacity-50 pointer-events-none transition-opacity duration-300">
+                            <label class="block text-sm font-bold text-stone-700 uppercase tracking-wide mb-3">3. Jurisdiction</label>
+                            <div class="flex space-x-4">
+                                <label class="flex items-center space-x-2 cursor-pointer p-3 border rounded-lg hover:bg-stone-50 w-full">
+                                    <input type="radio" name="jurisdiction" value="US" onchange="calculateResult()" class="form-radio text-teal-600">
+                                    <span class="font-medium">USA</span>
+                                </label>
+                                <label class="flex items-center space-x-2 cursor-pointer p-3 border rounded-lg hover:bg-stone-50 w-full">
+                                    <input type="radio" name="jurisdiction" value="EU" onchange="calculateResult()" class="form-radio text-teal-600">
+                                    <span class="font-medium">Europe (EPO)</span>
+                                </label>
+                                <label class="flex items-center space-x-2 cursor-pointer p-3 border rounded-lg hover:bg-stone-50 w-full">
+                                    <input type="radio" name="jurisdiction" value="India" onchange="calculateResult()" class="form-radio text-teal-600">
+                                    <span class="font-medium">India</span>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Right Column: The Result -->
+                    <div class="bg-stone-50 rounded-xl p-6 border border-stone-200 flex flex-col justify-center min-h-[300px]">
+                        <div id="result-placeholder" class="text-center text-stone-400">
+                            <div class="text-5xl mb-4">⚖️</div>
+                            <p class="text-lg">Complete the form to see the patentability assessment.</p>
+                        </div>
+                        <div id="result-content" class="hidden fade-in">
+                            <div class="flex items-center justify-between mb-4 border-b border-stone-200 pb-4">
+                                <span class="text-sm font-bold text-stone-500 uppercase">Assessment</span>
+                                <span id="result-badge" class="px-3 py-1 rounded-full text-sm font-bold bg-gray-200 text-gray-700">Pending</span>
+                            </div>
+                            <h3 id="result-title" class="text-2xl font-bold text-stone-900 mb-4">Likely Patentable</h3>
+                            <p id="result-text" class="text-stone-700 mb-6 leading-relaxed">
+                                Detailed explanation goes here.
+                            </p>
+                            <div class="bg-white p-4 rounded-lg border-l-4 border-teal-500 shadow-sm">
+                                <h4 class="text-sm font-bold text-teal-700 mb-1">Key Case Precedent:</h4>
+                                <p id="result-case" class="text-sm text-stone-600 italic">"Case Name (Year)"</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- SECTION 2: Landscape Analysis (Charts) -->
+        <section id="landscape-section" class="scroll-mt-20">
+            <div class="mb-8">
+                <h2 class="text-3xl font-bold text-stone-900">Global Patentability Landscape</h2>
+                <p class="text-stone-600 mt-2 max-w-3xl">
+                    Visualizing the permissiveness of different jurisdictions regarding life forms. While the US historically led in broadening scope, recent rulings have harmonized some aspects while diverging on others (like natural breeding).
+                </p>
+            </div>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <!-- Chart 1: Subject Matter Permissiveness -->
+                <div class="bg-white p-6 rounded-xl shadow-sm border border-stone-200">
+                    <h3 class="text-lg font-bold text-stone-800 mb-4">Scope of Patentable Subject Matter</h3>
+                    <div class="chart-container">
+                        <canvas id="permissivenessChart"></canvas>
+                    </div>
+                    <p class="text-xs text-stone-500 mt-4 text-center">
+                        *Score (0-10) based on analysis of case law restrictions (e.g., Sec 3(j) in India vs J.E.M. in US).
+                    </p>
+                </div>
+
+                <!-- Chart 2: The "Natural" vs "Engineered" Divide -->
+                <div class="bg-white p-6 rounded-xl shadow-sm border border-stone-200">
+                    <h3 class="text-lg font-bold text-stone-800 mb-4">Impact of Human Intervention Requirement</h3>
+                    <div class="chart-container">
+                        <canvas id="interventionChart"></canvas>
+                    </div>
+                    <p class="text-xs text-stone-500 mt-4 text-center">
+                        Shows the necessity of "Technical Intervention" for patent eligibility.
+                    </p>
+                </div>
+            </div>
+        </section>
+
+        <!-- SECTION 3: Detailed Case Timeline -->
+        <section id="timeline-section" class="scroll-mt-20">
+            <div class="flex flex-col md:flex-row justify-between items-end mb-8">
+                <div>
+                    <h2 class="text-3xl font-bold text-stone-900">Timeline of Precedents</h2>
+                    <p class="text-stone-600 mt-2">Explore the pivotal moments that defined the bio-patent laws.</p>
+                </div>
+                
+                <!-- Filter Controls -->
+                <div class="mt-4 md:mt-0 flex bg-stone-200 rounded-lg p-1">
+                    <button onclick="filterTimeline('all')" class="timeline-filter px-4 py-1 rounded-md text-sm font-medium bg-white shadow text-stone-800 transition-all">All</button>
+                    <button onclick="filterTimeline('US')" class="timeline-filter px-4 py-1 rounded-md text-sm font-medium text-stone-600 hover:bg-white/50 transition-all">USA</button>
+                    <button onclick="filterTimeline('EU')" class="timeline-filter px-4 py-1 rounded-md text-sm font-medium text-stone-600 hover:bg-white/50 transition-all">Europe</button>
+                    <button onclick="filterTimeline('India')" class="timeline-filter px-4 py-1 rounded-md text-sm font-medium text-stone-600 hover:bg-white/50 transition-all">India</button>
+                </div>
+            </div>
+
+            <div class="space-y-6" id="timeline-container">
+                <!-- Timeline items injected by JS -->
+            </div>
+        </section>
+
+        <!-- SECTION 4: Comparative Matrix -->
+        <section class="bg-stone-100 rounded-xl p-8 border border-stone-200">
+            <h2 class="text-2xl font-bold text-stone-900 mb-6">Jurisdictional Comparison Matrix</h2>
+            <div class="overflow-x-auto">
+                <table class="min-w-full bg-white rounded-lg shadow-sm overflow-hidden">
+                    <thead class="bg-stone-800 text-white">
+                        <tr>
+                            <th class="py-4 px-6 text-left text-sm font-semibold uppercase tracking-wider">Subject Matter</th>
+                            <th class="py-4 px-6 text-left text-sm font-semibold uppercase tracking-wider bg-blue-900">USA 🇺🇸</th>
+                            <th class="py-4 px-6 text-left text-sm font-semibold uppercase tracking-wider bg-blue-800">Europe (EU/EPO) 🇪🇺</th>
+                            <th class="py-4 px-6 text-left text-sm font-semibold uppercase tracking-wider bg-orange-700">India 🇮🇳</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-stone-200">
+                        <tr>
+                            <td class="py-4 px-6 font-medium text-stone-900">Microorganisms</td>
+                            <td class="py-4 px-6 text-stone-600">✅ <span class="font-bold">Patentable</span><br><span class="text-xs italic">Diamond v. Chakrabarty</span><br>Human-made bacteria are composition of matter.</td>
+                            <td class="py-4 px-6 text-stone-600">✅ <span class="font-bold">Patentable</span><br><span class="text-xs italic">Directive 98/44/EC</span><br>If isolated or technically produced.</td>
+                            <td class="py-4 px-6 text-stone-600">✅ <span class="font-bold">Patentable</span><br><span class="text-xs italic">Dimminaco A.G.</span><br>Even live vaccines are "manufacture".</td>
+                        </tr>
+                        <tr class="bg-stone-50">
+                            <td class="py-4 px-6 font-medium text-stone-900">Plants (GMO)</td>
+                            <td class="py-4 px-6 text-stone-600">✅ <span class="font-bold">Patentable</span><br><span class="text-xs italic">J.E.M. Ag Supply</span><br>Utility patents apply to plant breeds.</td>
+                            <td class="py-4 px-6 text-stone-600">✅ <span class="font-bold">Patentable</span><br>If not "exclusively" from biological process.</td>
+                            <td class="py-4 px-6 text-stone-600">❌ <span class="font-bold">Not Patentable</span><br><span class="text-xs italic">Section 3(j)</span><br>Explicit exclusion of plants.</td>
+                        </tr>
+                        <tr>
+                            <td class="py-4 px-6 font-medium text-stone-900">Plants (Naturally Bred)</td>
+                            <td class="py-4 px-6 text-stone-600">⚠️ <span class="font-bold">Strict</span><br><span class="text-xs italic">Funk Bros</span><br>Mixtures of nature not inventive.</td>
+                            <td class="py-4 px-6 text-stone-600">❌ <span class="font-bold">Not Patentable</span><br><span class="text-xs italic">G 3/19 "Pepper"</span><br>Products of essential biological processes barred.</td>
+                            <td class="py-4 px-6 text-stone-600">❌ <span class="font-bold">Not Patentable</span><br><span class="text-xs italic">Section 3(j)</span><br>Strict exclusion.</td>
+                        </tr>
+                        <tr class="bg-stone-50">
+                            <td class="py-4 px-6 font-medium text-stone-900">Genes / DNA</td>
+                            <td class="py-4 px-6 text-stone-600">⚠️ <span class="font-bold">Mixed</span><br><span class="text-xs italic">Myriad Genetics</span><br>Isolated DNA: No.<br>cDNA: Yes.</td>
+                            <td class="py-4 px-6 text-stone-600">✅ <span class="font-bold">Patentable</span><br><span class="text-xs italic">Directive 98/44/EC</span><br>Isolated DNA is patentable.</td>
+                            <td class="py-4 px-6 text-stone-600">⚠️ <span class="font-bold">Evolving</span><br><span class="text-xs italic">Monsanto (2024)</span><br>Engineered sequences may be "chemical compositions".</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- Footer -->
+        <footer class="text-center text-stone-500 text-sm mt-12 pb-8">
+            <p>© 2026 BioPatent Explorer. Based on provided source material regarding Biotechnology Patent Cases.</p>
+        </footer>
+
+    </main>
+
+    <script>
+        // --- DATA & STATE ---
+        let currentSubject = '';
+        let currentMethod = '';
+        let currentJurisdiction = '';
+
+        // Timeline Data
+        const cases = [
+            { year: 1948, region: 'US', title: 'Funk Bros v. Kalo Inoculant', desc: 'Mixture of natural bacteria strains not patentable without new function.', icon: '🌿' },
+            { year: 1980, region: 'US', title: 'Diamond v. Chakrabarty', desc: 'Genetically engineered bacteria patentable. "Anything under the sun made by man".', icon: '🦠' },
+            { year: 1998, region: 'EU', title: 'Biotech Directive 98/44/EC', desc: 'Harmonized rules: Isolated biological material is patentable.', icon: '⚖️' },
+            { year: 2001, region: 'US', title: 'J.E.M. Ag Supply v. Pioneer', desc: 'Plants/breeds patentable under utility patents (Section 101).', icon: '🌽' },
+            { year: 2002, region: 'India', title: 'Dimminaco A.G. v. Controller', desc: 'Process for live-virus vaccine is patentable "manufacture".', icon: '💉' },
+            { year: 2004, region: 'EU', title: 'Harvard Oncomouse', desc: 'Transgenic animals patentable if medical benefit outweighs suffering.', icon: '🐭' },
+            { year: 2005, region: 'India', title: 'Patents Act Section 3(j)', desc: 'Explicit exclusion of plants, animals, and essential biological processes.', icon: '📜' },
+            { year: 2013, region: 'US', title: 'Assoc. for Molecular Pathology v. Myriad', desc: 'Isolated natural DNA not patentable; cDNA is patentable.', icon: '🧬' },
+            { year: 2015, region: 'EU', title: 'Tomato II & Broccoli II', desc: 'Initial ruling allowed patents on plants from natural breeding (later overturned).', icon: '🥦' },
+            { year: 2020, region: 'EU', title: 'G 3/19 "Pepper"', desc: 'Overruled previous decisions: Plants exclusively from natural breeding NOT patentable.', icon: '🫑' },
+            { year: 2024, region: 'India', title: 'Monsanto v. Nuziveedu Seeds', desc: 'Supreme Court implies DNA sequences can be patentable "chemical compositions".', icon: '🧪' }
+        ];
+
+        // --- WIZARD LOGIC ---
+
+        function setSubject(subject) {
+            currentSubject = subject;
+            currentMethod = ''; 
+            currentJurisdiction = '';
+            
+            // Visual feedback
+            document.querySelectorAll('.subject-btn').forEach(btn => {
+                btn.classList.remove('bg-teal-100', 'border-teal-500', 'text-teal-800');
+                btn.classList.add('border-stone-200');
+            });
+            const activeBtn = document.getElementById(`btn-${subject}`);
+            activeBtn.classList.remove('border-stone-200');
+            activeBtn.classList.add('bg-teal-100', 'border-teal-500', 'text-teal-800');
+
+            // Show Next Step
+            const step2 = document.getElementById('step-2-container');
+            step2.classList.remove('opacity-50', 'pointer-events-none');
+            step2.classList.add('opacity-100');
+
+            // Populate Methods based on Subject
+            const methodContainer = document.getElementById('method-options');
+            methodContainer.innerHTML = ''; // Clear
+
+            let options = [];
+            if (subject === 'plant' || subject === 'animal') {
+                options = [
+                    { val: 'gmo', text: 'Genetically Modified / Engineered (e.g., Transgenic)' },
+                    { val: 'natural', text: 'Naturally Bred / Essential Biological Process' }
+                ];
+            } else if (subject === 'gene') {
+                options = [
+                    { val: 'isolated', text: 'Isolated Natural Sequence (Genomic DNA)' },
+                    { val: 'synthetic', text: 'Synthetic / Modified (e.g., cDNA)' }
+                ];
+            } else if (subject === 'microorganism') {
+                options = [
+                    { val: 'modified', text: 'Human-made / Engineered / Vaccine Process' },
+                    { val: 'natural_mix', text: 'Natural Mixture without new function' }
+                ];
+            }
+
+            options.forEach(opt => {
+                const label = document.createElement('label');
+                label.className = 'flex items-center space-x-2 cursor-pointer p-3 border rounded-lg hover:bg-stone-50 transition-colors';
+                label.innerHTML = `
+                    <input type="radio" name="method" value="${opt.val}" onchange="setMethod('${opt.val}')" class="form-radio text-teal-600">
+                    <span class="font-medium text-stone-700">${opt.text}</span>
+                `;
+                methodContainer.appendChild(label);
+            });
+            
+            // Hide result if changing subject
+            hideResult();
+        }
+
+        function setMethod(method) {
+            currentMethod = method;
+            // Show Step 3
+            const step3 = document.getElementById('step-3-container');
+            step3.classList.remove('opacity-50', 'pointer-events-none');
+            step3.classList.add('opacity-100');
+            
+            // Clear radio buttons in step 3 if needed, or trigger calc if already selected
+            const jurisRadios = document.querySelectorAll('input[name="jurisdiction"]');
+            let jurisSelected = false;
+            jurisRadios.forEach(r => { if(r.checked) jurisSelected = true; });
+            if(jurisSelected) calculateResult();
+        }
+
+        function calculateResult() {
+            const jurisRadios = document.querySelectorAll('input[name="jurisdiction"]');
+            jurisRadios.forEach(r => { if(r.checked) currentJurisdiction = r.value; });
+
+            if (!currentSubject || !currentMethod || !currentJurisdiction) return;
+
+            let resultTitle = "";
+            let resultText = "";
+            let resultBadge = "";
+            let resultCase = "";
+            let badgeColor = "";
+
+            // LOGIC ENGINE BASED ON SOURCE TEXT
+            
+            // --- USA ---
+            if (currentJurisdiction === 'US') {
+                if (currentSubject === 'microorganism') {
+                    if (currentMethod === 'modified') {
+                        resultTitle = "Patent Eligible";
+                        resultBadge = "Yes";
+                        badgeColor = "bg-green-100 text-green-800";
+                        resultText = "The Supreme Court ruled that human-made living organisms are patentable subject matter under §101.";
+                        resultCase = "Diamond v. Chakrabarty (1980)";
+                    } else {
+                        resultTitle = "Likely Not Patentable";
+                        resultBadge = "No";
+                        badgeColor = "bg-red-100 text-red-800";
+                        resultText = "Merely discovering that natural strains can be mixed without new function is not an invention.";
+                        resultCase = "Funk Brothers Seed Co. v. Kalo Inoculant (1948)";
+                    }
+                } else if (currentSubject === 'plant') {
+                    resultTitle = "Patent Eligible"; // JEM covers general utility
+                    resultBadge = "Yes";
+                    badgeColor = "bg-green-100 text-green-800";
+                    resultText = "Plants and plant breeds are patentable under utility patent statutes, even with other specific plant acts in existence.";
+                    resultCase = "J.E.M. Ag Supply v. Pioneer (2001)";
+                    if (currentMethod === 'natural') {
+                        resultText += " However, purely natural mixtures without invention remain barred under Funk Bros principles.";
+                    }
+                } else if (currentSubject === 'animal') {
+                    if (currentMethod === 'gmo') {
+                        resultTitle = "Patent Eligible";
+                        resultBadge = "Likely Yes";
+                        badgeColor = "bg-green-100 text-green-800";
+                        resultText = "Following the Chakrabarty logic ('anything under the sun made by man'), engineered animals are generally eligible.";
+                        resultCase = "Diamond v. Chakrabarty (Extension)";
+                    } else {
+                        resultTitle = "Unlikely";
+                        resultBadge = "No";
+                        badgeColor = "bg-red-100 text-red-800";
+                        resultText = "Products of nature are not patentable.";
+                        resultCase = "General Principles";
+                    }
+                } else if (currentSubject === 'gene') {
+                    if (currentMethod === 'isolated') {
+                        resultTitle = "Not Patentable";
+                        resultBadge = "No";
+                        badgeColor = "bg-red-100 text-red-800";
+                        resultText = "Naturally occurring DNA segments are 'products of nature' and cannot be patented simply by isolating them.";
+                        resultCase = "Assoc. for Molecular Pathology v. Myriad Genetics (2013)";
+                    } else { // synthetic/cDNA
+                        resultTitle = "Patent Eligible";
+                        resultBadge = "Yes";
+                        badgeColor = "bg-green-100 text-green-800";
+                        resultText = "cDNA is patent-eligible because it omits introns and is synthetically created, distinguishing it from nature.";
+                        resultCase = "Assoc. for Molecular Pathology v. Myriad Genetics (2013)";
+                    }
+                }
+            }
+
+            // --- EU ---
+            else if (currentJurisdiction === 'EU') {
+                if (currentSubject === 'microorganism') {
+                    resultTitle = "Patent Eligible";
+                    resultBadge = "Yes";
+                    badgeColor = "bg-green-100 text-green-800";
+                    resultText = "Biological material isolated from its environment or produced by a technical process is patentable.";
+                    resultCase = "Directive 98/44/EC";
+                } else if (currentSubject === 'plant' || currentSubject === 'animal') {
+                    if (currentMethod === 'gmo') {
+                        resultTitle = "Patent Eligible";
+                        resultBadge = "Yes";
+                        badgeColor = "bg-green-100 text-green-800";
+                        resultText = "Technically derived organisms are patentable. For animals, ethical benefits must outweigh suffering.";
+                        resultCase = "Harvard Oncomouse (2004) / Directive 98/44/EC";
+                    } else { // natural
+                        resultTitle = "Not Patentable";
+                        resultBadge = "No";
+                        badgeColor = "bg-red-100 text-red-800";
+                        resultText = "Plants or animals obtained exclusively by means of an essentially biological process (natural breeding) are excluded.";
+                        resultCase = "G 3/19 'Pepper' (2020)";
+                    }
+                } else if (currentSubject === 'gene') {
+                    resultTitle = "Patent Eligible";
+                    resultBadge = "Yes";
+                    badgeColor = "bg-green-100 text-green-800";
+                    resultText = "Unlike the US, the EU allows patents on isolated natural DNA sequences if a technical function is disclosed.";
+                    resultCase = "Directive 98/44/EC";
+                }
+            }
+
+            // --- INDIA ---
+            else if (currentJurisdiction === 'India') {
+                if (currentSubject === 'microorganism') {
+                     if (currentMethod === 'modified') {
+                        resultTitle = "Patent Eligible";
+                        resultBadge = "Yes";
+                        badgeColor = "bg-green-100 text-green-800";
+                        resultText = "Processes for creating live vaccines (containing microbes) are patentable 'manufactures'.";
+                        resultCase = "Dimminaco A.G. v. Controller (2002)";
+                     } else {
+                        resultTitle = "Not Patentable";
+                        resultBadge = "No";
+                        badgeColor = "bg-red-100 text-red-800";
+                        resultText = "Discovery of living things occurring in nature is not patentable.";
+                        resultCase = "Patents Act Section 3(c)";
+                     }
+                } else if (currentSubject === 'plant' || currentSubject === 'animal') {
+                    resultTitle = "Not Patentable";
+                    resultBadge = "No";
+                    badgeColor = "bg-red-100 text-red-800";
+                    resultText = "Section 3(j) explicitly excludes plants and animals in whole or any part thereof.";
+                    resultCase = "Patents Act Section 3(j) (2005)";
+                } else if (currentSubject === 'gene') {
+                    if (currentMethod === 'isolated') {
+                        resultTitle = "Highly Contested";
+                        resultBadge = "Uncertain";
+                        badgeColor = "bg-yellow-100 text-yellow-800";
+                        resultText = "Strictly, parts of nature are excluded. However, engineered sequences might be patentable.";
+                        resultCase = "Section 3(c) / 3(j)";
+                    } else { // synthetic/engineered
+                        resultTitle = "Potentially Patentable";
+                        resultBadge = "Arguable";
+                        badgeColor = "bg-yellow-100 text-yellow-800";
+                        resultText = "The Supreme Court indicated that engineered DNA sequences may be 'chemical compositions' or 'inventive microorganisms' outside the Section 3(j) exclusion.";
+                        resultCase = "Monsanto Technology v. Nuziveedu Seeds (2024)";
+                    }
+                }
+            }
+
+            // Render Output
+            const resultDiv = document.getElementById('result-content');
+            const placeholder = document.getElementById('result-placeholder');
+            
+            placeholder.style.display = 'none';
+            resultDiv.classList.remove('hidden');
+            resultDiv.style.display = 'block';
+
+            document.getElementById('result-badge').textContent = resultBadge;
+            document.getElementById('result-badge').className = `px-3 py-1 rounded-full text-sm font-bold ${badgeColor}`;
+            document.getElementById('result-title').textContent = resultTitle;
+            document.getElementById('result-text').textContent = resultText;
+            document.getElementById('result-case').textContent = resultCase;
+        }
+
+        function hideResult() {
+            document.getElementById('result-content').style.display = 'none';
+            document.getElementById('result-placeholder').style.display = 'block';
+        }
+
+        // --- TIMELINE RENDER ---
+        function filterTimeline(region) {
+            const container = document.getElementById('timeline-container');
+            container.innerHTML = '';
+            
+            // Update button styles
+            document.querySelectorAll('.timeline-filter').forEach(btn => {
+                if(btn.innerText.includes(region === 'all' ? 'All' : region)) {
+                    btn.classList.add('bg-white', 'shadow', 'text-stone-800');
+                    btn.classList.remove('text-stone-600', 'hover:bg-white/50');
+                } else {
+                    btn.classList.remove('bg-white', 'shadow', 'text-stone-800');
+                    btn.classList.add('text-stone-600', 'hover:bg-white/50');
+                }
+            });
+
+            const filteredCases = region === 'all' ? cases : cases.filter(c => c.region === region || (region === 'EU' && c.region.includes('EU')));
+
+            filteredCases.forEach((c, index) => {
+                const item = document.createElement('div');
+                item.className = 'flex group fade-in';
+                item.style.animationDelay = `${index * 0.1}s`;
+                item.innerHTML = `
+                    <div class="flex-shrink-0 w-16 md:w-24 text-right mr-4 md:mr-8 pt-2">
+                        <span class="text-xl font-bold text-teal-700 block">${c.year}</span>
+                        <span class="text-xs uppercase tracking-wider font-semibold text-stone-400">${c.region}</span>
+                    </div>
+                    <div class="relative flex-grow pb-8 border-l-2 border-stone-200 pl-4 md:pl-8 group-last:border-0">
+                        <div class="absolute -left-[9px] top-3 w-4 h-4 rounded-full bg-white border-4 border-stone-300 group-hover:border-teal-500 transition-colors"></div>
+                        <div class="bg-white p-4 rounded-lg shadow-sm border border-stone-100 hover:shadow-md transition-shadow">
+                            <div class="flex items-center mb-2">
+                                <span class="text-2xl mr-3">${c.icon}</span>
+                                <h4 class="text-lg font-bold text-stone-800">${c.title}</h4>
+                            </div>
+                            <p class="text-stone-600 leading-snug">${c.desc}</p>
+                        </div>
+                    </div>
+                `;
+                container.appendChild(item);
+            });
+        }
+
+        function scrollToSection(id) {
+            document.getElementById(id).scrollIntoView({ behavior: 'smooth' });
+        }
+
+        // --- CHARTS ---
+        document.addEventListener('DOMContentLoaded', () => {
+            filterTimeline('all');
+
+            // Chart 1: Permissiveness Radar/Bar
+            const ctx1 = document.getElementById('permissivenessChart').getContext('2d');
+            new Chart(ctx1, {
+                type: 'bar',
+                data: {
+                    labels: ['Microorganisms (Eng.)', 'Plants (GMO)', 'Plants (Natural)', 'Genes (Isolated)'],
+                    datasets: [
+                        {
+                            label: 'USA',
+                            data: [10, 10, 2, 1], // US: High for engineered, low for natural mix/genes
+                            backgroundColor: 'rgba(59, 130, 246, 0.6)',
+                            borderColor: 'rgb(59, 130, 246)',
+                            borderWidth: 1
+                        },
+                        {
+                            label: 'EU',
+                            data: [10, 10, 0, 10], // EU: High for isolated genes/engineered, 0 for natural plants (G 3/19)
+                            backgroundColor: 'rgba(30, 64, 175, 0.6)',
+                            borderColor: 'rgb(30, 64, 175)',
+                            borderWidth: 1
+                        },
+                        {
+                            label: 'India',
+                            data: [8, 1, 0, 4], // India: High for microbes, Very low for plants (Sec 3j), mid for genes (Monsanto)
+                            backgroundColor: 'rgba(194, 65, 12, 0.6)',
+                            borderColor: 'rgb(194, 65, 12)',
+                            borderWidth: 1
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: { beginAtZero: true, max: 10, title: { display: true, text: 'Scope Index (Est.)' } }
+                    }
+                }
+            });
+
+            // Chart 2: Intervention Requirement
+            const ctx2 = document.getElementById('interventionChart').getContext('2d');
+            new Chart(ctx2, {
+                type: 'line',
+                data: {
+                    labels: ['Natural Discovery', 'Isolated Material', 'Technical Process', 'Genetic Engineering'],
+                    datasets: [{
+                        label: 'Likelihood of Patent Eligibility (Global Avg)',
+                        data: [5, 40, 85, 95],
+                        fill: true,
+                        backgroundColor: 'rgba(20, 184, 166, 0.2)',
+                        borderColor: 'rgb(20, 184, 166)',
+                        tension: 0.3
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    if(context.raw < 20) return "Low: 'Product of Nature' Doctrine";
+                                    if(context.raw > 80) return "High: Clear Human Intervention";
+                                    return "Medium: Jurisdiction Dependent";
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        y: { display: false }
+                    }
+                }
+            });
+        });
+
+    </script>
+</body>
+</html>
